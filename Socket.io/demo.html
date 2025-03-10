@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socket.IO Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 80vh;
+    }
+
+    #messages {
+      flex: 1;
+      list-style-type: none;
+      padding: 20px;
+      overflow-y: auto;
+      border-bottom: 1px solid #eee;
+    }
+
+    #messages li {
+      padding: 10px 15px;
+      margin-bottom: 10px;
+      background-color: #e9ecef;
+      border-radius: 15px;
+      max-width: 70%;
+      word-wrap: break-word;
+      position: relative;
+    }
+
+    #messages li span.timestamp {
+      font-size: 0.7em;
+      color: #666;
+      display: block;
+      margin-top: 5px;
+    }
+
+    #form {
+      display: flex;
+      padding: 10px;
+      background-color: #f8f9fa;
+    }
+
+    #input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      outline: none;
+      font-size: 1em;
+      margin-right: 10px;
+    }
+
+    #input:focus {
+      border-color: #007bff;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .header {
+      background-color: #007bff;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="header">Socket.IO Chat</div>
+    <ul id="messages"></ul>
+    <form id="form">
+      <input id="input" autocomplete="off" placeholder="Type a message..." />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:3000', {
+      transports: ['websocket', 'polling']
+    });
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+    const sendButton = form.querySelector('button');
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      sendButton.disabled = false; // Enable button on connect
+    });
+
+    socket.on('chat_message', (msg) => {
+      const item = document.createElement('li');
+      const messageText = document.createElement('span');
+      const timestamp = document.createElement('span');
+
+      messageText.textContent = msg;
+      timestamp.textContent = new Date().toLocaleTimeString();
+      timestamp.className = 'timestamp';
+
+      item.appendChild(messageText);
+      item.appendChild(timestamp);
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight; // Auto-scroll to bottom
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      sendButton.disabled = true; // Disable button on error
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value.trim()) {
+        socket.emit('chat_message', input.value);
+        input.value = '';
+      }
+    });
+
+    // Disable send button initially until connected
+    sendButton.disabled = true;
+  </script>
+</body>
+</html>
