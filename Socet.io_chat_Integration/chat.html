@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Socket.IO Two-Way Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat-wrapper {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .chat-container {
+      flex: 1;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 70vh;
+    }
+
+    .chat-header {
+      background-color: #007bff;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .chat-header.chat-2 {
+      background-color: #28a745;
+    }
+
+    .messages {
+      flex: 1;
+      list-style-type: none;
+      padding: 15px;
+      overflow-y: auto;
+      border-bottom: 1px solid #eee;
+    }
+
+    .messages li {
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+
+    .messages li.sent {
+      background-color: #007bff;
+      color: white;
+      margin-left: auto; /* Align sent messages to the right */
+    }
+
+    .messages li.received {
+      background-color: #e9ecef;
+      color: black;
+      margin-right: auto; /* Align received messages to the left */
+    }
+
+    .messages li span.timestamp {
+      font-size: 0.65em;
+      display: block;
+      margin-top: 4px;
+      color: #ddd; /* Lighter for sent messages */
+    }
+
+    .messages li.received span.timestamp {
+      color: #666; /* Darker for received messages */
+    }
+
+    form {
+      display: flex;
+      padding: 10px;
+      background-color: #f8f9fa;
+    }
+
+    input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 15px;
+      outline: none;
+      margin-right: 10px;
+    }
+
+    input:focus {
+      border-color: #007bff;
+    }
+
+    button {
+      padding: 8px 15px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 15px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .chat-2 button {
+      background-color: #28a745;
+    }
+
+    .chat-2 button:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-wrapper">
+    <!-- Chat 1 (Sends to Chat 2) -->
+    <div class="chat-container">
+      <div class="chat-header">Chat 1</div>
+      <ul class="messages" id="messages-1"></ul>
+      <form id="form-1">
+        <input id="input-1" autocomplete="off" placeholder="Send to Chat 2..." />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+
+    <!-- Chat 2 (Sends to Chat 1) -->
+    <div class="chat-container chat-2">
+      <div class="chat-header chat-2">Chat 2</div>
+      <ul class="messages" id="messages-2"></ul>
+      <form id="form-2">
+        <input id="input-2" autocomplete="off" placeholder="Send to Chat 1..." />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script>
+    const socket = io('http://localhost:3000', {
+      transports: ['websocket', 'polling']
+    });
+
+    // Chat 1 elements
+    const form1 = document.getElementById('form-1');
+    const input1 = document.getElementById('input-1');
+    const messages1 = document.getElementById('messages-1');
+    const sendButton1 = form1.querySelector('button');
+
+    // Chat 2 elements
+    const form2 = document.getElementById('form-2');
+    const input2 = document.getElementById('input-2');
+    const messages2 = document.getElementById('messages-2');
+    const sendButton2 = form2.querySelector('button');
+
+    // Function to add a message to a chat
+    function addMessage(chatList, msg, isSent) {
+      const item = document.createElement('li');
+      const messageText = document.createElement('span');
+      const timestamp = document.createElement('span');
+      messageText.textContent = msg;
+      timestamp.textContent = new Date().toLocaleTimeString();
+      timestamp.className = 'timestamp';
+      item.className = isSent ? 'sent' : 'received';
+      item.appendChild(messageText);
+      item.appendChild(timestamp);
+      chatList.appendChild(item);
+      chatList.scrollTop = chatList.scrollHeight;
+    }
+
+    // Connection handling
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      sendButton1.disabled = false;
+      sendButton2.disabled = false;
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      sendButton1.disabled = true;
+      sendButton2.disabled = true;
+    });
+
+    // Chat 1 receives messages from Chat 2
+    socket.on('chat_message_1', (msg) => {
+      addMessage(messages1, msg, false); // Received in Chat 1
+    });
+
+    // Chat 1 sends to Chat 2
+    form1.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input1.value.trim()) {
+        const message = input1.value;
+        addMessage(messages1, message, true); // Show as sent in Chat 1
+        socket.emit('chat_message_1', message); // Send to Chat 2
+        input1.value = '';
+      }
+    });
+
+    // Chat 2 receives messages from Chat 1
+    socket.on('chat_message_2', (msg) => {
+      addMessage(messages2, msg, false); // Received in Chat 2
+    });
+
+    // Chat 2 sends to Chat 1
+    form2.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input2.value.trim()) {
+        const message = input2.value;
+        addMessage(messages2, message, true); // Show as sent in Chat 2
+        socket.emit('chat_message_2', message); // Send to Chat 1
+        input2.value = '';
+      }
+    });
+
+    // Disable buttons initially
+    sendButton1.disabled = true;
+    sendButton2.disabled = true;
+  </script>
+</body>
+</html>
